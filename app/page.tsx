@@ -2,6 +2,7 @@
 
 import {
   ExternalLink,
+  FileText,
   Headphones,
   Languages,
   Loader2,
@@ -18,6 +19,7 @@ import {
   FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -136,7 +138,57 @@ function firstUsefulText(item: FeedItem) {
   return [item.content, item.summary, item.title].find((value) => value.trim()) ?? "";
 }
 
+const speechChunkMaxLength = 2_500;
+
+function splitTextForSpeech(text: string) {
+  const normalized = text
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (!normalized) return [];
+
+  const tokens =
+    normalized.match(/[^。！？.!?\n]+[。！？.!?]?|\n+/g) ?? [normalized];
+  const chunks: string[] = [];
+  let current = "";
+
+  function pushCurrent() {
+    const next = current.trim();
+    if (next) chunks.push(next);
+    current = "";
+  }
+
+  for (const token of tokens) {
+    let piece = token.trim();
+    if (!piece) continue;
+
+    while (piece.length > speechChunkMaxLength) {
+      if (current) pushCurrent();
+      chunks.push(piece.slice(0, speechChunkMaxLength));
+      piece = piece.slice(speechChunkMaxLength).trim();
+    }
+
+    if (!piece) continue;
+
+    const separator = current ? "\n" : "";
+    if (current.length + separator.length + piece.length > speechChunkMaxLength) {
+      pushCurrent();
+    }
+
+    current = current ? `${current}\n${piece}` : piece;
+  }
+
+  pushCurrent();
+
+  return chunks;
+}
+
 async function readApiError(response: Response) {
+  if (response.status === 401) {
+    return "访问口令未填写或不正确。";
+  }
+
   const text = await response.text();
 
   try {
@@ -322,11 +374,15 @@ export default function Home() {
   const [status, setStatus] = useState<StatusState>({ kind: "idle", message: "" });
   const [summaryResult, setSummaryResult] = useState("");
   const [translationResult, setTranslationResult] = useState("");
-  const [audioUrl, setAudioUrl] = useState("");
+  const [audioSegments, setAudioSegments] = useState<string[]>([]);
+  const [currentAudioSegmentIndex, setCurrentAudioSegmentIndex] = useState(0);
+  const [shouldAutoPlayAudio, setShouldAutoPlayAudio] = useState(false);
   const [isFetchingRss, setIsFetchingRss] = useState(false);
   const [aiAction, setAiAction] = useState<"summary" | "translate" | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const audioSegmentsRef = useRef<string[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setSettings(
@@ -346,6 +402,21 @@ export default function Home() {
     window.localStorage.setItem(settingsKey, JSON.stringify(settings));
   }, [settings]);
 
+  useEffect(() => {
+    return () => {
+      audioSegmentsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shouldAutoPlayAudio || !audioRef.current) {
+      return;
+    }
+
+    audioRef.current.play().catch(() => undefined);
+    setShouldAutoPlayAudio(false);
+  }, [currentAudioSegmentIndex, shouldAutoPlayAudio]);
+
   const selectedItem = useMemo(() => {
     if (!feed) return null;
     return feed.items.find((item) => item.id === selectedId) ?? feed.items[0] ?? null;
@@ -360,6 +431,7 @@ export default function Home() {
     filteredVoiceOptions.find((option) => option.value === settings.azureVoice) ??
     filteredVoiceOptions[0] ??
     azureVoiceOptions[0];
+  const currentAudioUrl = audioSegments[currentAudioSegmentIndex] ?? "";
 
   const authHeaders = useMemo<Record<string, string>>(() => {
     const token = settings.appToken.trim();
@@ -371,6 +443,18 @@ export default function Home() {
 
     return headers;
   }, [settings.appToken]);
+
+  function replaceAudioSegments(nextSegments: string[]) {
+    audioSegmentsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    audioSegmentsRef.current = nextSegments;
+    setAudioSegments(nextSegments);
+    setCurrentAudioSegmentIndex(0);
+    setShouldAutoPlayAudio(false);
+  }
+
+  function clearAudioSegments() {
+    replaceAudioSegments([]);
+  }
 
   function updateSources(nextSources: SavedSource[]) {
     setSources(nextSources);
@@ -403,7 +487,7 @@ export default function Home() {
     setStatus({ kind: "idle", message: "正在载入 RSS，并获取文章全文..." });
     setSummaryResult("");
     setTranslationResult("");
-    setAudioUrl("");
+    clearAudioSegments();
 
     try {
       const response = await fetch(`/api/rss?url=${encodeURIComponent(trimmedUrl)}`, {
@@ -502,35 +586,50 @@ export default function Home() {
       return;
     }
 
+    const chunks = splitTextForSpeech(text);
+    const nextAudioSegments: string[] = [];
+
     setIsGeneratingAudio(true);
-    setStatus({ kind: "idle", message: "正在生成原文音频..." });
+    clearAudioSegments();
+    setStatus({
+      kind: "idle",
+      message: `正在生成原文音频，共 ${chunks.length} 段...`,
+    });
 
     try {
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          ...authHeaders,
-        },
-        body: JSON.stringify({
-          text,
-          voice: settings.azureVoice,
-          language: selectedVoiceOption.language,
-        }),
+      for (const [index, chunk] of chunks.entries()) {
+        setStatus({
+          kind: "idle",
+          message: `正在生成原文音频 ${index + 1}/${chunks.length}...`,
+        });
+
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...authHeaders,
+          },
+          body: JSON.stringify({
+            text: chunk,
+            voice: settings.azureVoice,
+            language: selectedVoiceOption.language,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(await readApiError(response));
+        }
+
+        nextAudioSegments.push(URL.createObjectURL(await response.blob()));
+      }
+
+      replaceAudioSegments(nextAudioSegments);
+      setStatus({
+        kind: "ok",
+        message: `音频已生成，共 ${chunks.length} 段，播放时会自动衔接。`,
       });
-
-      if (!response.ok) {
-        throw new Error(await readApiError(response));
-      }
-
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-      }
-
-      const nextAudioUrl = URL.createObjectURL(await response.blob());
-      setAudioUrl(nextAudioUrl);
-      setStatus({ kind: "ok", message: "音频已就绪。" });
     } catch (error) {
+      nextAudioSegments.forEach((url) => URL.revokeObjectURL(url));
       setStatus({
         kind: "error",
         message: error instanceof Error ? error.message : "音频生成失败。",
@@ -579,16 +678,15 @@ export default function Home() {
       </header>
 
       <div className="main-grid">
-        <aside className="side-stack">
-          <section className="panel settings-panel" aria-labelledby="settings-title">
+        <div className="navigation-stack">
+          <aside className="side-stack">
+            <section className="panel settings-panel" aria-labelledby="settings-title">
             <div className="panel-header">
               <div>
                 <h2 className="panel-title" id="settings-title">
                   偏好
                 </h2>
-                <p className="panel-note">
-                  {isSettingsOpen ? "仅保存在本机浏览器" : "模型 / 翻译 / 音色"}
-                </p>
+                <p className="panel-note">访问口令 / 模型 / 翻译 / 音色</p>
               </div>
               <button
                 aria-expanded={isSettingsOpen}
@@ -716,137 +814,153 @@ export default function Home() {
                 </p>
               </div>
             ) : null}
-          </section>
+            </section>
 
-          <section className="panel" aria-labelledby="sources-title">
+            <section className="panel" aria-labelledby="sources-title">
+              <div className="panel-header">
+                <div>
+                  <h2 className="panel-title" id="sources-title">
+                    RSS 源
+                  </h2>
+                  <p className="panel-note">最近使用</p>
+                </div>
+                <button
+                  className="button icon-only ghost"
+                  type="button"
+                  onClick={clearSources}
+                  disabled={!sources.length}
+                  title="清空记录"
+                >
+                  <Trash2 />
+                </button>
+              </div>
+
+              <div className="panel-body source-list">
+                {sources.length ? (
+                  sources.map((source) => (
+                    <button
+                      className={`source-item ${source.url === rssUrl ? "active" : ""}`}
+                      key={source.url}
+                      type="button"
+                      onClick={() => fetchFeed(source.url)}
+                    >
+                      <p className="item-title">{source.title}</p>
+                      <div className="item-meta">
+                        <span>{compactDate(source.lastFetchedAt)}</span>
+                        <span>{source.url}</span>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <p className="hint">暂无记录</p>
+                )}
+              </div>
+            </section>
+          </aside>
+
+          <section className="panel feed-panel" aria-labelledby="feed-title">
             <div className="panel-header">
               <div>
-                <h2 className="panel-title" id="sources-title">
-                  RSS 源
+                <h2 className="panel-title" id="feed-title">
+                  文章
                 </h2>
-                <p className="panel-note">最近使用</p>
+                <p className="panel-note">Feed 内容</p>
               </div>
-              <button
-                className="button icon-only ghost"
-                type="button"
-                onClick={clearSources}
-                disabled={!sources.length}
-                title="清空记录"
-              >
-                <Trash2 />
-              </button>
+              <Rss aria-hidden="true" />
             </div>
 
-            <div className="panel-body source-list">
-              {sources.length ? (
-                sources.map((source) => (
-                  <button
-                    className={`source-item ${source.url === rssUrl ? "active" : ""}`}
-                    key={source.url}
-                    type="button"
-                    onClick={() => fetchFeed(source.url)}
-                  >
-                    <p className="item-title">{source.title}</p>
+            {feed ? (
+              <>
+                <div className="feed-meta">
+                  <h2>{feed.title || "未命名 RSS"}</h2>
+                  {feed.description ? <p>{feed.description}</p> : null}
+                </div>
+                <div className="article-list-wrap article-list">
+                  {feed.items.map((item) => (
+                    <button
+                      className={`article-item ${
+                        item.id === selectedItem?.id ? "active" : ""
+                      }`}
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(item.id);
+                        setSummaryResult("");
+                        setTranslationResult("");
+                        clearAudioSegments();
+                      }}
+                    >
+                      <p className="item-title">{item.title || "未命名文章"}</p>
+                      <div className="item-meta">
+                        <span>{compactDate(item.pubDate)}</span>
+                        {item.author ? <span>{item.author}</span> : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="empty">暂无文章</div>
+            )}
+          </section>
+        </div>
+
+        <div className="workspace-stack">
+          <section className="panel original-panel" aria-labelledby="original-title">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title" id="original-title">
+                  原文
+                </h2>
+                <p className="panel-note">当前文章</p>
+              </div>
+              <FileText aria-hidden="true" />
+            </div>
+
+            <div className="panel-body">
+              {selectedItem ? (
+                <article className="article-detail">
+                  <div>
+                    <h2 className="detail-title">{selectedItem.title}</h2>
+                    {selectedItem.link ? (
+                      <a
+                        className="detail-link"
+                        href={selectedItem.link}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        查看原文 <ExternalLink size={13} />
+                      </a>
+                    ) : null}
                     <div className="item-meta">
-                      <span>{compactDate(source.lastFetchedAt)}</span>
-                      <span>{source.url}</span>
+                      <span>{compactDate(selectedItem.pubDate)}</span>
+                      {selectedItem.author ? <span>{selectedItem.author}</span> : null}
                     </div>
-                  </button>
-                ))
+                  </div>
+
+                  <div className="original-window-body markdown-content">
+                    <MarkdownText value={selectedMarkdown || "暂无正文"} />
+                  </div>
+                </article>
               ) : (
-                <p className="hint">暂无记录</p>
+                <div className="empty">未选择文章</div>
               )}
             </div>
           </section>
-        </aside>
 
-        <section className="panel" aria-labelledby="feed-title">
-          <div className="panel-header">
-            <div>
-              <h2 className="panel-title" id="feed-title">
-                文章
-              </h2>
-              <p className="panel-note">Feed 内容</p>
-            </div>
-            <Rss aria-hidden="true" />
-          </div>
-
-          {feed ? (
-            <>
-              <div className="feed-meta">
-                <h2>{feed.title || "未命名 RSS"}</h2>
-                {feed.description ? <p>{feed.description}</p> : null}
+          <section className="panel workbench-panel" aria-labelledby="workbench-title">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title" id="workbench-title">
+                  工作台
+                </h2>
+                <p className="panel-note">总结 / 翻译 / 音频</p>
               </div>
-              <div className="article-list-wrap article-list">
-                {feed.items.map((item) => (
-                  <button
-                    className={`article-item ${
-                      item.id === selectedItem?.id ? "active" : ""
-                    }`}
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedId(item.id);
-                      setSummaryResult("");
-                      setTranslationResult("");
-                      setAudioUrl("");
-                    }}
-                  >
-                    <p className="item-title">{item.title || "未命名文章"}</p>
-                    <div className="item-meta">
-                      <span>{compactDate(item.pubDate)}</span>
-                      {item.author ? <span>{item.author}</span> : null}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="empty">暂无文章</div>
-          )}
-        </section>
-
-        <section className="panel" aria-labelledby="article-title">
-          <div className="panel-header">
-            <div>
-              <h2 className="panel-title" id="article-title">
-                工作台
-              </h2>
-              <p className="panel-note">原文 / 总结 / 翻译 / 音频</p>
+              <Save aria-hidden="true" />
             </div>
-            <Save aria-hidden="true" />
-          </div>
 
-          <div className="panel-body">
-            {selectedItem ? (
-              <article className="article-detail">
-                <div>
-                  <h2 className="detail-title">{selectedItem.title}</h2>
-                  {selectedItem.link ? (
-                    <a
-                      className="detail-link"
-                      href={selectedItem.link}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      查看原文 <ExternalLink size={13} />
-                    </a>
-                  ) : null}
-                  <div className="item-meta">
-                    <span>{compactDate(selectedItem.pubDate)}</span>
-                    {selectedItem.author ? <span>{selectedItem.author}</span> : null}
-                    <span>
-                      {selectedItem.contentSource === "article"
-                        ? "全文"
-                        : "来自 RSS"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="content-box markdown-content">
-                  <MarkdownText value={selectedMarkdown || "暂无正文"} />
-                </div>
-
+            <div className="panel-body">
+              {selectedItem ? (
                 <div className="window-grid">
                   <section className="tool-window" aria-label="总结模块">
                     <div className="tool-window-header">
@@ -920,8 +1034,59 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="tool-window-body">
-                      {audioUrl ? (
-                        <audio className="audio-player" src={audioUrl} controls />
+                      {currentAudioUrl ? (
+                        <div className="audio-stack">
+                          <audio
+                            className="audio-player"
+                            controls
+                            key={currentAudioUrl}
+                            onEnded={() => {
+                              if (currentAudioSegmentIndex < audioSegments.length - 1) {
+                                setCurrentAudioSegmentIndex((current) => current + 1);
+                                setShouldAutoPlayAudio(true);
+                              }
+                            }}
+                            ref={audioRef}
+                            src={currentAudioUrl}
+                          />
+                          {audioSegments.length > 1 ? (
+                            <div className="audio-meta">
+                              <span>
+                                第 {currentAudioSegmentIndex + 1} / {audioSegments.length} 段
+                              </span>
+                              <div className="audio-nav">
+                                <button
+                                  className="button module-action"
+                                  disabled={currentAudioSegmentIndex === 0}
+                                  onClick={() => {
+                                    setCurrentAudioSegmentIndex((current) =>
+                                      Math.max(0, current - 1),
+                                    );
+                                    setShouldAutoPlayAudio(false);
+                                  }}
+                                  type="button"
+                                >
+                                  上一段
+                                </button>
+                                <button
+                                  className="button module-action"
+                                  disabled={
+                                    currentAudioSegmentIndex >= audioSegments.length - 1
+                                  }
+                                  onClick={() => {
+                                    setCurrentAudioSegmentIndex((current) =>
+                                      Math.min(audioSegments.length - 1, current + 1),
+                                    );
+                                    setShouldAutoPlayAudio(false);
+                                  }}
+                                  type="button"
+                                >
+                                  下一段
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
                       ) : (
                         <p className="result-text">
                           {isGeneratingAudio ? "正在生成音频..." : "暂无音频"}
@@ -930,12 +1095,12 @@ export default function Home() {
                     </div>
                   </section>
                 </div>
-              </article>
-            ) : (
-              <div className="empty">未选择文章</div>
-            )}
-          </div>
-        </section>
+              ) : (
+                <div className="empty">未选择文章</div>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
     </main>
   );

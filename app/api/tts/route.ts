@@ -1,11 +1,11 @@
 import https from "node:https";
 import { requireAuth } from "@/lib/auth";
-import { truncateText } from "@/lib/rss";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
 
 const azureOutputFormat = "audio-24khz-48kbitrate-mono-mp3";
+const maxSpeechTextLength = 3_000;
 
 function escapeSsml(text: string) {
   return text
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
   const baseUrl = process.env.AZURE_SPEECH_BASE_URL?.trim();
   const voice = String(payload.voice ?? "").trim();
   const language = String(payload.language ?? "zh-CN").trim();
-  const text = truncateText(String(payload.text ?? "").trim(), 8_000);
+  const text = String(payload.text ?? "").trim();
 
   if (!key || (!region && !baseUrl)) {
     return Response.json(
@@ -129,6 +129,13 @@ export async function POST(request: Request) {
 
   if (!text) {
     return Response.json({ error: "Missing text." }, { status: 400 });
+  }
+
+  if (text.length > maxSpeechTextLength) {
+    return Response.json(
+      { error: "TTS text is too long. Please split it into smaller chunks." },
+      { status: 413 },
+    );
   }
 
   if (!voice) {
