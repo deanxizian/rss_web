@@ -670,23 +670,18 @@ a {
 
 .audio-stack {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+}
+
+.audio-segment {
+  display: grid;
+  gap: 6px;
 }
 
 .audio-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
-}
-
-.audio-nav {
-  display: flex;
-  gap: 8px;
-  flex: 0 0 auto;
 }
 
 .divider {

@@ -376,14 +376,11 @@ export default function Home() {
   const [summaryResult, setSummaryResult] = useState("");
   const [translationResult, setTranslationResult] = useState("");
   const [audioSegments, setAudioSegments] = useState<string[]>([]);
-  const [currentAudioSegmentIndex, setCurrentAudioSegmentIndex] = useState(0);
-  const [shouldAutoPlayAudio, setShouldAutoPlayAudio] = useState(false);
   const [isFetchingRss, setIsFetchingRss] = useState(false);
   const [aiAction, setAiAction] = useState<"summary" | "translate" | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const audioSegmentsRef = useRef<string[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setSettings(
@@ -409,15 +406,6 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!shouldAutoPlayAudio || !audioRef.current) {
-      return;
-    }
-
-    audioRef.current.play().catch(() => undefined);
-    setShouldAutoPlayAudio(false);
-  }, [currentAudioSegmentIndex, shouldAutoPlayAudio]);
-
   const selectedItem = useMemo(() => {
     if (!feed) return null;
     return feed.items.find((item) => item.id === selectedId) ?? feed.items[0] ?? null;
@@ -437,7 +425,6 @@ export default function Home() {
     filteredVoiceOptions.find((option) => option.value === settings.azureVoice) ??
     filteredVoiceOptions[0] ??
     azureVoiceOptions[0];
-  const currentAudioUrl = audioSegments[currentAudioSegmentIndex] ?? "";
 
   const authHeaders = useMemo<Record<string, string>>(() => {
     const token = settings.appToken.trim();
@@ -454,8 +441,12 @@ export default function Home() {
     audioSegmentsRef.current.forEach((url) => URL.revokeObjectURL(url));
     audioSegmentsRef.current = nextSegments;
     setAudioSegments(nextSegments);
-    setCurrentAudioSegmentIndex(0);
-    setShouldAutoPlayAudio(false);
+  }
+
+  function appendAudioSegment(nextSegment: string) {
+    const nextSegments = [...audioSegmentsRef.current, nextSegment];
+    audioSegmentsRef.current = nextSegments;
+    setAudioSegments(nextSegments);
   }
 
   function clearAudioSegments() {
@@ -593,7 +584,6 @@ export default function Home() {
     }
 
     const chunks = splitTextForSpeech(text);
-    const nextAudioSegments: string[] = [];
 
     setIsGeneratingAudio(true);
     clearAudioSegments();
@@ -626,19 +616,22 @@ export default function Home() {
           throw new Error(await readApiError(response));
         }
 
-        nextAudioSegments.push(URL.createObjectURL(await response.blob()));
+        appendAudioSegment(URL.createObjectURL(await response.blob()));
       }
 
-      replaceAudioSegments(nextAudioSegments);
       setStatus({
         kind: "ok",
-        message: `音频已生成，共 ${chunks.length} 段，播放时会自动衔接。`,
+        message: `音频已生成，共 ${chunks.length} 段。`,
       });
     } catch (error) {
-      nextAudioSegments.forEach((url) => URL.revokeObjectURL(url));
+      const generatedCount = audioSegmentsRef.current.length;
+      const errorMessage =
+        error instanceof Error ? error.message : "音频生成失败。";
       setStatus({
         kind: "error",
-        message: error instanceof Error ? error.message : "音频生成失败。",
+        message: generatedCount
+          ? `已生成 ${generatedCount}/${chunks.length} 段，后续失败：${errorMessage}`
+          : errorMessage,
       });
     } finally {
       setIsGeneratingAudio(false);
@@ -1046,58 +1039,18 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="tool-window-body">
-                      {currentAudioUrl ? (
+                      {audioSegments.length ? (
                         <div className="audio-stack">
-                          <audio
-                            className="audio-player"
-                            controls
-                            key={currentAudioUrl}
-                            onEnded={() => {
-                              if (currentAudioSegmentIndex < audioSegments.length - 1) {
-                                setCurrentAudioSegmentIndex((current) => current + 1);
-                                setShouldAutoPlayAudio(true);
-                              }
-                            }}
-                            ref={audioRef}
-                            src={currentAudioUrl}
-                          />
-                          {audioSegments.length > 1 ? (
-                            <div className="audio-meta">
-                              <span>
-                                第 {currentAudioSegmentIndex + 1} / {audioSegments.length} 段
-                              </span>
-                              <div className="audio-nav">
-                                <button
-                                  className="button module-action"
-                                  disabled={currentAudioSegmentIndex === 0}
-                                  onClick={() => {
-                                    setCurrentAudioSegmentIndex((current) =>
-                                      Math.max(0, current - 1),
-                                    );
-                                    setShouldAutoPlayAudio(false);
-                                  }}
-                                  type="button"
-                                >
-                                  上一段
-                                </button>
-                                <button
-                                  className="button module-action"
-                                  disabled={
-                                    currentAudioSegmentIndex >= audioSegments.length - 1
-                                  }
-                                  onClick={() => {
-                                    setCurrentAudioSegmentIndex((current) =>
-                                      Math.min(audioSegments.length - 1, current + 1),
-                                    );
-                                    setShouldAutoPlayAudio(false);
-                                  }}
-                                  type="button"
-                                >
-                                  下一段
-                                </button>
-                              </div>
+                          {audioSegments.map((url, index) => (
+                            <div className="audio-segment" key={url}>
+                              {audioSegments.length > 1 ? (
+                                <div className="audio-meta">
+                                  第 {index + 1} / {audioSegments.length} 段
+                                </div>
+                              ) : null}
+                              <audio className="audio-player" controls src={url} />
                             </div>
-                          ) : null}
+                          ))}
                         </div>
                       ) : (
                         <p className="result-text">

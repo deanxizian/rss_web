@@ -2,6 +2,8 @@
 
 个人 RSS 阅读器，部署目标是 Vercel。前端负责阅读和操作界面，Next.js Route Handlers 负责 RSS 代理解析、AI 总结/翻译、Azure Speech 音频生成。
 
+![RSS AI Reader 界面截图](docs/screenshot.png)
+
 ## 功能
 
 - 粘贴 RSS 链接并解析文章列表

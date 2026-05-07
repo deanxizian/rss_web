@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const maxDuration = 45;
 
 const azureOutputFormat = "audio-24khz-48kbitrate-mono-mp3";
-const azureSpeechRequestTimeoutMs = 18_000;
+const azureSpeechRequestTimeoutMs = 30_000;
 const maxSpeechTextLength = 900;
 
 function escapeSsml(text: string) {
