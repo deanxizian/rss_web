@@ -33,4 +33,4 @@ AZURE_SPEECH_BASE_URL=
 
 ## Vercel 部署
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/deanxizian/rss_web&project-name=rss-web&env=APP_TOKEN,OPENAI_API_KEY,OPENAI_BASE_URL,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,GEMINI_API_KEY,GEMINI_BASE_URL,AZURE_SPEECH_KEY,AZURE_SPEECH_REGION,AZURE_SPEECH_BASE_URL)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/deanxizian/rss_web&project-name=rss-web)
