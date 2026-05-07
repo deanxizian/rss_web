@@ -1,0 +1,30 @@
+export const openAIModelOptions = [
+  { value: "gpt-5.4-nano", label: "gpt-5.4-nano" },
+  { value: "gpt-5.4-mini", label: "gpt-5.4-mini" },
+  { value: "gpt-5.5", label: "gpt-5.5" },
+  {
+    value: "gemini-3.1-flash-lite-preview",
+    label: "gemini-3.1-flash-lite-preview",
+  },
+  { value: "deepseek-v4-flash", label: "deepseek-v4-flash" },
+] as const;
+
+export const translationLanguageOptions = [
+  { value: "中文", label: "中文" },
+  { value: "英文", label: "英文" },
+] as const;
+
+export const azureVoiceOptions = [
+  { value: "zh-CN-XiaoxiaoNeural", label: "晓晓（中文女声）", language: "zh-CN" },
+  { value: "zh-CN-XiaoyiNeural", label: "晓伊（中文女声）", language: "zh-CN" },
+  { value: "zh-CN-YunxiNeural", label: "云希（中文男声）", language: "zh-CN" },
+  { value: "zh-CN-YunjianNeural", label: "云健（中文男声）", language: "zh-CN" },
+  { value: "zh-CN-YunyangNeural", label: "云扬（中文男声）", language: "zh-CN" },
+  { value: "en-US-JennyNeural", label: "Jenny（英文女声）", language: "en-US" },
+  { value: "en-US-GuyNeural", label: "Guy（英文男声）", language: "en-US" },
+] as const;
+
+export const speechLanguageOptions = [
+  { value: "zh-CN", label: "中文" },
+  { value: "en-US", label: "英文" },
+] as const;
