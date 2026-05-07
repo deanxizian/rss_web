@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+    return Response.json({ error: "请求内容不是有效 JSON。" }, { status: 400 });
   }
 
   const payload = body as {
@@ -69,15 +69,15 @@ export async function POST(request: Request) {
   const model = payload.model?.trim();
 
   if (!["summary", "translate"].includes(action)) {
-    return Response.json({ error: "Invalid action." }, { status: 400 });
+    return Response.json({ error: "AI 操作类型无效。" }, { status: 400 });
   }
 
   if (!text) {
-    return Response.json({ error: "Missing text." }, { status: 400 });
+    return Response.json({ error: "缺少可处理文本。" }, { status: 400 });
   }
 
   if (!model) {
-    return Response.json({ error: "Missing AI model." }, { status: 400 });
+    return Response.json({ error: "缺少 AI 模型。" }, { status: 400 });
   }
 
   try {
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     return Response.json({ text: resultText });
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "OpenAI request failed." },
+      { error: error instanceof Error ? error.message : "AI 请求失败。" },
       { status: 500 },
     );
   }

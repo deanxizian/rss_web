@@ -40,7 +40,7 @@ export function validateRssUrl(input: string) {
   const url = new URL(input);
 
   if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error("Only http and https RSS URLs are allowed.");
+    throw new Error("仅支持 http 或 https RSS 链接。");
   }
 
   const hostname = url.hostname.toLowerCase();
@@ -52,7 +52,7 @@ export function validateRssUrl(input: string) {
     isPrivateIpv4(hostname) ||
     net.isIP(hostname) === 6
   ) {
-    throw new Error("Local and private network URLs are not allowed.");
+    throw new Error("不支持本机或内网 RSS 链接。");
   }
 
   return url.toString();

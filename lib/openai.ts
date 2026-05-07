@@ -66,7 +66,7 @@ export async function generateText({
   const apiKey = getApiKeyForModel(model);
 
   if (!apiKey) {
-    throw new Error(`${getProviderName(model)}_API_KEY is not configured.`);
+    throw new Error(`${getProviderName(model)}_API_KEY 未配置。`);
   }
 
   const openai = getOpenAIClient(getBaseURLForModel(model), apiKey);
@@ -96,7 +96,7 @@ export async function generateText({
   const content = response.choices[0]?.message?.content;
 
   if (typeof content !== "string" || !content) {
-    throw new Error("Model returned an empty response.");
+    throw new Error("模型返回了空内容。");
   }
 
   return content;
@@ -113,11 +113,11 @@ async function generateGeminiText({
   const baseURL = getBaseURLForModel(model)?.replace(/\/$/, "");
 
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
+    throw new Error("GEMINI_API_KEY 未配置。");
   }
 
   if (!baseURL) {
-    throw new Error("GEMINI_BASE_URL is not configured.");
+    throw new Error("GEMINI_BASE_URL 未配置。");
   }
 
   const endpointBase = baseURL.endsWith("/v1beta") ? baseURL : `${baseURL}/v1beta`;
@@ -138,7 +138,7 @@ async function generateGeminiText({
   const rawText = await response.text();
 
   if (!response.ok) {
-    throw new Error(rawText || `Gemini request failed with ${response.status}.`);
+    throw new Error(rawText || `Gemini 请求失败，状态码 ${response.status}。`);
   }
 
   try {
@@ -169,7 +169,7 @@ async function generateGeminiText({
   }
 
   if (!rawText.trim()) {
-    throw new Error("Gemini returned an empty response.");
+    throw new Error("Gemini 返回了空内容。");
   }
 
   return rawText;

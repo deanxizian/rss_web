@@ -678,6 +678,12 @@ a {
   gap: 6px;
 }
 
+.audio-progress {
+  color: var(--accent-strong);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .audio-meta {
   color: var(--muted);
   font-size: 12px;

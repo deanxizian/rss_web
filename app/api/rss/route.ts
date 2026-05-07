@@ -66,7 +66,7 @@ export async function GET(request: Request) {
   const rawUrl = searchParams.get("url");
 
   if (!rawUrl) {
-    return Response.json({ error: "Missing RSS url." }, { status: 400 });
+    return Response.json({ error: "缺少 RSS 链接。" }, { status: 400 });
   }
 
   let rssUrl: string;
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
     rssUrl = validateRssUrl(rawUrl);
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "Invalid RSS url." },
+      { error: error instanceof Error ? error.message : "RSS 链接无效。" },
       { status: 400 },
     );
   }
@@ -96,7 +96,7 @@ export async function GET(request: Request) {
 
     if (!response.ok) {
       return Response.json(
-        { error: `RSS fetch failed with status ${response.status}.` },
+        { error: `RSS 请求失败，状态码 ${response.status}。` },
         { status: 502 },
       );
     }
@@ -104,7 +104,7 @@ export async function GET(request: Request) {
     const xml = await response.text();
 
     if (xml.length > 2_000_000) {
-      return Response.json({ error: "RSS feed is too large." }, { status: 413 });
+      return Response.json({ error: "RSS 内容过大。" }, { status: 413 });
     }
 
     const feed = await parser.parseString(xml);
@@ -157,10 +157,10 @@ export async function GET(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error && error.name === "AbortError"
-        ? "RSS fetch timed out."
+        ? "RSS 请求超时。"
         : error instanceof Error
           ? error.message
-          : "Failed to parse RSS feed.";
+          : "RSS 解析失败。";
 
     return Response.json({ error: message }, { status: 500 });
   } finally {

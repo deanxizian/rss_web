@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "RSS AI Reader",
-  description: "Personal RSS reader with translation, summaries, and speech.",
+  description: "个人 RSS 阅读器，支持 AI 总结、翻译和朗读。",
 };
 
 export default function RootLayout({

@@ -119,7 +119,7 @@ function safeJsonParse<T>(value: string | null, fallback: T) {
 }
 
 function compactDate(value: string) {
-  if (!value) return "时间未知";
+  if (!value) return "未标注时间";
 
   const date = new Date(value);
 
@@ -187,7 +187,7 @@ function splitTextForSpeech(text: string) {
 
 async function readApiError(response: Response) {
   if (response.status === 401) {
-    return "访问口令未填写或不正确。";
+    return "访问口令缺失或不正确。";
   }
 
   const text = await response.text();
@@ -376,6 +376,7 @@ export default function Home() {
   const [summaryResult, setSummaryResult] = useState("");
   const [translationResult, setTranslationResult] = useState("");
   const [audioSegments, setAudioSegments] = useState<string[]>([]);
+  const [audioSegmentTotal, setAudioSegmentTotal] = useState(0);
   const [isFetchingRss, setIsFetchingRss] = useState(false);
   const [aiAction, setAiAction] = useState<"summary" | "translate" | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
@@ -441,6 +442,7 @@ export default function Home() {
     audioSegmentsRef.current.forEach((url) => URL.revokeObjectURL(url));
     audioSegmentsRef.current = nextSegments;
     setAudioSegments(nextSegments);
+    setAudioSegmentTotal(nextSegments.length);
   }
 
   function appendAudioSegment(nextSegment: string) {
@@ -476,12 +478,12 @@ export default function Home() {
     const trimmedUrl = url.trim();
 
     if (!trimmedUrl) {
-      setStatus({ kind: "error", message: "请输入 RSS 源链接。" });
+      setStatus({ kind: "error", message: "请输入 RSS 链接。" });
       return;
     }
 
     setIsFetchingRss(true);
-    setStatus({ kind: "idle", message: "正在载入 RSS，并获取文章全文..." });
+    setStatus({ kind: "idle", message: "正在读取 RSS，并提取文章全文…" });
     setSummaryResult("");
     setTranslationResult("");
     clearAudioSegments();
@@ -505,12 +507,12 @@ export default function Home() {
       ).length;
       setStatus({
         kind: "ok",
-        message: `已载入 ${nextFeed.items.length} 篇，${fullTextCount} 篇获取到全文。`,
+        message: `已读取 ${nextFeed.items.length} 篇，其中 ${fullTextCount} 篇提取到全文。`,
       });
     } catch (error) {
       setStatus({
         kind: "error",
-        message: error instanceof Error ? error.message : "RSS 载入失败。",
+        message: error instanceof Error ? error.message : "RSS 读取失败。",
       });
     } finally {
       setIsFetchingRss(false);
@@ -524,7 +526,7 @@ export default function Home() {
 
   async function runAiAction(action: "summary" | "translate") {
     if (!selectedItem || !selectedText.trim()) {
-      setStatus({ kind: "error", message: "这篇文章没有可处理的正文。" });
+      setStatus({ kind: "error", message: "当前文章没有可处理的正文。" });
       return;
     }
 
@@ -536,7 +538,7 @@ export default function Home() {
     }
     setStatus({
       kind: "idle",
-      message: action === "summary" ? "正在生成总结..." : "正在翻译原文...",
+      message: action === "summary" ? "正在生成总结…" : "正在翻译文章…",
     });
 
     try {
@@ -564,11 +566,15 @@ export default function Home() {
       } else {
         setTranslationResult(data.text);
       }
-      setStatus({ kind: "ok", message: "已完成。" });
+      setStatus({
+        kind: "ok",
+        message: action === "summary" ? "总结已生成。" : "翻译已完成。",
+      });
     } catch (error) {
       setStatus({
         kind: "error",
-        message: error instanceof Error ? error.message : "处理失败。",
+        message:
+          error instanceof Error ? error.message : "处理失败，请稍后重试。",
       });
     } finally {
       setAiAction(null);
@@ -579,7 +585,7 @@ export default function Home() {
     const text = selectedText;
 
     if (!text.trim()) {
-      setStatus({ kind: "error", message: "这篇文章没有可生成音频的正文。" });
+      setStatus({ kind: "error", message: "当前文章没有可生成音频的正文。" });
       return;
     }
 
@@ -587,16 +593,17 @@ export default function Home() {
 
     setIsGeneratingAudio(true);
     clearAudioSegments();
+    setAudioSegmentTotal(chunks.length);
     setStatus({
       kind: "idle",
-      message: `正在生成原文音频，共 ${chunks.length} 段...`,
+      message: `准备生成朗读音频，共 ${chunks.length} 段…`,
     });
 
     try {
       for (const [index, chunk] of chunks.entries()) {
         setStatus({
           kind: "idle",
-          message: `正在生成原文音频 ${index + 1}/${chunks.length}...`,
+          message: `正在生成朗读音频 ${index + 1}/${chunks.length}…`,
         });
 
         const response = await fetch("/api/tts", {
@@ -617,20 +624,30 @@ export default function Home() {
         }
 
         appendAudioSegment(URL.createObjectURL(await response.blob()));
+
+        const generatedCount = index + 1;
+        if (generatedCount < chunks.length) {
+          setStatus({
+            kind: "idle",
+            message: `已生成 ${generatedCount}/${chunks.length} 段，继续生成下一段…`,
+          });
+        }
       }
 
       setStatus({
         kind: "ok",
-        message: `音频已生成，共 ${chunks.length} 段。`,
+        message: `朗读音频全部生成完成，共 ${chunks.length} 段。`,
       });
     } catch (error) {
       const generatedCount = audioSegmentsRef.current.length;
       const errorMessage =
-        error instanceof Error ? error.message : "音频生成失败。";
+        error instanceof Error ? error.message : "音频生成失败，请稍后重试。";
       setStatus({
         kind: "error",
         message: generatedCount
-          ? `已生成 ${generatedCount}/${chunks.length} 段，后续失败：${errorMessage}`
+          ? `已保留 ${generatedCount}/${chunks.length} 段；第 ${
+              generatedCount + 1
+            } 段生成失败：${errorMessage}`
           : errorMessage,
       });
     } finally {
@@ -646,9 +663,9 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <div className="topbar-inner">
-          <div className="brand">
-            <h1 className="brand-title">RSS AI Reader</h1>
-            <p className="brand-subtitle">个人 RSS 阅读与 AI 处理</p>
+            <div className="brand">
+              <h1 className="brand-title">RSS AI Reader</h1>
+            <p className="brand-subtitle">RSS 阅读、总结、翻译与朗读</p>
           </div>
 
           <form className="rss-form" onSubmit={handleRssSubmit}>
@@ -656,22 +673,22 @@ export default function Home() {
               className="input"
               value={rssUrl}
               onChange={(event) => setRssUrl(event.target.value)}
-              placeholder="输入 RSS 源 URL"
-              aria-label="RSS 源链接"
+              placeholder="输入 RSS 链接"
+              aria-label="RSS 链接"
             />
             <button
               className="button primary"
               type="submit"
               disabled={isFetchingRss}
-              title="载入 RSS"
+              title="读取 RSS"
             >
               {isFetchingRss ? <Loader2 className="spin" /> : <Send />}
-              载入
+              读取
             </button>
           </form>
 
           <div className={`status-line ${status.kind}`}>
-            {status.message || "准备就绪"}
+            {status.message || "等待 RSS 链接"}
           </div>
         </div>
       </header>
@@ -685,7 +702,7 @@ export default function Home() {
                 <h2 className="panel-title" id="settings-title">
                   偏好
                 </h2>
-                <p className="panel-note">访问口令 / 模型 / 翻译 / 音色</p>
+                <p className="panel-note">口令、模型、翻译、音色</p>
               </div>
               <button
                 aria-expanded={isSettingsOpen}
@@ -712,7 +729,7 @@ export default function Home() {
                         appToken: event.target.value,
                       }))
                     }
-                    placeholder="可留空"
+                    placeholder="留空则不启用"
                   />
                 </label>
 
@@ -737,7 +754,7 @@ export default function Home() {
                 </label>
 
                 <label className="setting-row">
-                  <span className="label">翻译为</span>
+                  <span className="label">目标语言</span>
                   <select
                     className="select"
                     value={settings.targetLanguage}
@@ -759,7 +776,7 @@ export default function Home() {
                 <div className="divider" />
 
                 <label className="setting-row">
-                  <span className="label">音频语言</span>
+                  <span className="label">朗读语言</span>
                   <select
                     className="select"
                     value={settings.speechLanguage}
@@ -783,7 +800,7 @@ export default function Home() {
                 </label>
 
                 <label className="setting-row">
-                  <span className="label">音色</span>
+                  <span className="label">朗读音色</span>
                   <select
                     className="select"
                     value={selectedVoiceOption.value}
@@ -809,7 +826,7 @@ export default function Home() {
                 </label>
 
                 <p className="hint">
-                  密钥与 Base URL 来自环境变量；访问口令为空时不校验。
+                  模型和语音密钥从环境变量读取；口令为空时不启用校验。
                 </p>
               </div>
             ) : null}
@@ -819,16 +836,16 @@ export default function Home() {
               <div className="panel-header">
                 <div>
                   <h2 className="panel-title" id="sources-title">
-                    RSS 源
+                    RSS 订阅
                   </h2>
-                  <p className="panel-note">最近使用</p>
+                  <p className="panel-note">最近读取</p>
                 </div>
                 <button
                   className="button icon-only ghost"
                   type="button"
                   onClick={clearSources}
                   disabled={!sources.length}
-                  title="清空记录"
+                  title="清空最近记录"
                 >
                   <Trash2 />
                 </button>
@@ -851,7 +868,7 @@ export default function Home() {
                     </button>
                   ))
                 ) : (
-                  <p className="hint">暂无记录</p>
+                  <p className="hint">还没有最近记录</p>
                 )}
               </div>
             </section>
@@ -860,10 +877,10 @@ export default function Home() {
           <section className="panel feed-panel" aria-labelledby="feed-title">
             <div className="panel-header">
               <div>
-                <h2 className="panel-title" id="feed-title">
-                  文章
-                </h2>
-                <p className="panel-note">Feed 内容</p>
+                  <h2 className="panel-title" id="feed-title">
+                    文章
+                  </h2>
+                <p className="panel-note">订阅内容</p>
               </div>
               <Rss aria-hidden="true" />
             </div>
@@ -871,7 +888,7 @@ export default function Home() {
             {feed ? (
               <>
                 <div className="feed-meta">
-                  <h2>{feed.title || "未命名 RSS"}</h2>
+                  <h2>{feed.title || "未命名订阅"}</h2>
                   {feed.description ? <p>{feed.description}</p> : null}
                 </div>
                 <div className="article-list-wrap article-list">
@@ -899,7 +916,7 @@ export default function Home() {
                 </div>
               </>
             ) : (
-              <div className="empty">暂无文章</div>
+              <div className="empty">还没有文章</div>
             )}
           </section>
         </div>
@@ -908,10 +925,10 @@ export default function Home() {
           <section className="panel original-panel" aria-labelledby="original-title">
             <div className="panel-header">
               <div>
-                <h2 className="panel-title" id="original-title">
-                  原文
-                </h2>
-                <p className="panel-note">当前文章</p>
+                  <h2 className="panel-title" id="original-title">
+                    原文
+                  </h2>
+                <p className="panel-note">正文内容</p>
               </div>
               <FileText aria-hidden="true" />
             </div>
@@ -928,7 +945,7 @@ export default function Home() {
                         rel="noreferrer"
                         target="_blank"
                       >
-                        查看原文 <ExternalLink size={13} />
+                        打开原文 <ExternalLink size={13} />
                       </a>
                     ) : null}
                     <div className="item-meta">
@@ -938,11 +955,11 @@ export default function Home() {
                   </div>
 
                   <div className="original-window-body markdown-content">
-                    <MarkdownText value={selectedMarkdown || "暂无正文"} />
+                    <MarkdownText value={selectedMarkdown || "还没有正文内容"} />
                   </div>
                 </article>
               ) : (
-                <div className="empty">未选择文章</div>
+                <div className="empty">请选择文章</div>
               )}
             </div>
           </section>
@@ -950,10 +967,10 @@ export default function Home() {
           <section className="panel workbench-panel" aria-labelledby="workbench-title">
             <div className="panel-header">
               <div>
-                <h2 className="panel-title" id="workbench-title">
-                  工作台
-                </h2>
-                <p className="panel-note">总结 / 翻译 / 音频</p>
+                  <h2 className="panel-title" id="workbench-title">
+                    工作台
+                  </h2>
+                <p className="panel-note">总结、翻译、朗读</p>
               </div>
               <Wrench aria-hidden="true" />
             </div>
@@ -983,9 +1000,9 @@ export default function Home() {
                         {summaryResult ? (
                           <MarkdownText value={summaryResult} />
                         ) : aiAction === "summary" ? (
-                          "正在生成总结..."
+                          "正在生成总结…"
                         ) : (
-                          "暂无总结"
+                          "还没有总结"
                         )}
                       </div>
                     </div>
@@ -1013,9 +1030,9 @@ export default function Home() {
                         {translationResult ? (
                           <MarkdownText value={translationResult} />
                         ) : aiAction === "translate" ? (
-                          "正在翻译原文..."
+                          "正在翻译文章…"
                         ) : (
-                          "暂无译文"
+                          "还没有译文"
                         )}
                       </div>
                     </div>
@@ -1025,27 +1042,33 @@ export default function Home() {
                     <div className="tool-window-header">
                       <div className="window-title">
                         <Headphones />
-                        <span>原文音频</span>
+                        <span>朗读音频</span>
                       </div>
                       <button
                         className="button primary module-action"
                         type="button"
                         onClick={generateAzureAudio}
                         disabled={isGeneratingAudio}
-                        title="生成原文音频"
+                        title="生成朗读音频"
                       >
                         {isGeneratingAudio ? <Loader2 /> : <Headphones />}
-                        生成音频
+                        {isGeneratingAudio ? "生成中" : "生成音频"}
                       </button>
                     </div>
                     <div className="tool-window-body">
                       {audioSegments.length ? (
                         <div className="audio-stack">
+                          {isGeneratingAudio && audioSegmentTotal > 1 ? (
+                            <div className="audio-progress">
+                              已生成 {audioSegments.length}/{audioSegmentTotal} 段，剩余段落继续生成中…
+                            </div>
+                          ) : null}
                           {audioSegments.map((url, index) => (
                             <div className="audio-segment" key={url}>
-                              {audioSegments.length > 1 ? (
+                              {(audioSegmentTotal || audioSegments.length) > 1 ? (
                                 <div className="audio-meta">
-                                  第 {index + 1} / {audioSegments.length} 段
+                                  第 {index + 1} /{" "}
+                                  {audioSegmentTotal || audioSegments.length} 段
                                 </div>
                               ) : null}
                               <audio className="audio-player" controls src={url} />
@@ -1054,14 +1077,14 @@ export default function Home() {
                         </div>
                       ) : (
                         <p className="result-text">
-                          {isGeneratingAudio ? "正在生成音频..." : "暂无音频"}
+                          {isGeneratingAudio ? "正在生成音频…" : "还没有音频"}
                         </p>
                       )}
                     </div>
                   </section>
                 </div>
               ) : (
-                <div className="empty">未选择文章</div>
+                <div className="empty">请选择文章</div>
               )}
             </div>
           </section>

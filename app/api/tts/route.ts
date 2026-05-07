@@ -105,10 +105,10 @@ async function requestAzureSpeech({
     );
 
     timeout = setTimeout(() => {
-      request.destroy(new Error("Azure Speech request timed out."));
+      request.destroy(new Error("Azure Speech 请求超时。"));
     }, azureSpeechRequestTimeoutMs);
     request.setTimeout(azureSpeechRequestTimeoutMs, () => {
-      request.destroy(new Error("Azure Speech request timed out."));
+      request.destroy(new Error("Azure Speech 请求超时。"));
     });
     request.on("error", (error) => {
       finish(() => reject(error));
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+    return Response.json({ error: "请求内容不是有效 JSON。" }, { status: 400 });
   }
 
   const payload = body as {
@@ -145,24 +145,24 @@ export async function POST(request: Request) {
 
   if (!key || (!region && !baseUrl)) {
     return Response.json(
-      { error: "Azure Speech key and region or base URL are not configured." },
+      { error: "Azure Speech 密钥和区域或 Base URL 未配置。" },
       { status: 500 },
     );
   }
 
   if (!text) {
-    return Response.json({ error: "Missing text." }, { status: 400 });
+    return Response.json({ error: "缺少可朗读文本。" }, { status: 400 });
   }
 
   if (text.length > maxSpeechTextLength) {
     return Response.json(
-      { error: "TTS text is too long. Please split it into smaller chunks." },
+      { error: "朗读文本过长，请拆分后重试。" },
       { status: 413 },
     );
   }
 
   if (!voice) {
-    return Response.json({ error: "Missing Azure Speech voice." }, { status: 400 });
+    return Response.json({ error: "缺少 Azure Speech 音色。" }, { status: 400 });
   }
 
   const ssml = `<speak version="1.0" xml:lang="${language}"><voice xml:lang="${language}" name="${voice}">${escapeSsml(text)}</voice></speak>`;
@@ -201,7 +201,7 @@ export async function POST(request: Request) {
         {
           error:
             errorText ||
-            `Azure Speech request failed with ${response.status}.`,
+            `Azure Speech 请求失败，状态码 ${response.status}。`,
         },
         { status: 502 },
       );
@@ -209,7 +209,7 @@ export async function POST(request: Request) {
 
     if (!audioBuffer || audioBuffer.byteLength === 0) {
       return Response.json(
-        { error: "Azure Speech returned an empty audio response." },
+        { error: "Azure Speech 返回了空音频。" },
         { status: 502 },
       );
     }
@@ -231,7 +231,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "Azure Speech failed." },
+      { error: error instanceof Error ? error.message : "Azure Speech 请求失败。" },
       { status: 500 },
     );
   }
