@@ -17,25 +17,30 @@ function buildPrompt({
   targetLanguage: string;
 }) {
   if (action === "summary") {
-    return `用中文简要总结这篇文章，不要添加原文没有的信息。
+    return `用中文简要总结这篇文章，不要添加原文没有的信息。输出必须是 Markdown。
 
-输出：
-- 一句话总结
+输出格式：
+## 一句话总结
+用一句话概括文章。
+
+## 要点
 - 最多 5 个要点
 
 原文：
 ${text}`;
   }
 
-  return `请把下面内容翻译成${targetLanguage}。
+  return `请把下面 Markdown 内容翻译成${targetLanguage}。
 
 要求：
 1. 保留原意。
 2. 标题、术语、人名、产品名尽量准确。
 3. 输出自然流畅。
-4. 不要添加原文没有的信息。
+4. 保留原文 Markdown 结构，包括标题层级、列表、引用、代码块、链接格式和段落分隔。
+5. 只翻译可读文本，不要改写 URL、代码块内容或 Markdown 语法。
+6. 不要添加原文没有的信息。
 
-原文：
+Markdown 原文：
 ${text}`;
 }
 

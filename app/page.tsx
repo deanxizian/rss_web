@@ -1,17 +1,18 @@
 "use client";
 
 import {
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   FileText,
   Headphones,
   Languages,
   Loader2,
   Rss,
-  Save,
   Send,
-  Settings,
   Sparkles,
   Trash2,
+  Wrench,
 } from "lucide-react";
 import {
   Fragment,
@@ -424,6 +425,11 @@ export default function Home() {
 
   const selectedText = selectedItem ? firstUsefulText(selectedItem) : "";
   const selectedMarkdown = selectedItem?.contentMarkdown?.trim() || selectedText;
+  const selectedAiMarkdown = selectedItem
+    ? [selectedItem.title ? `# ${selectedItem.title}` : "", selectedMarkdown]
+        .filter((value) => value.trim())
+        .join("\n\n")
+    : "";
   const filteredVoiceOptions = azureVoiceOptions.filter(
     (option) => option.language === settings.speechLanguage,
   );
@@ -551,7 +557,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           action,
-          text: `${selectedItem.title}\n\n${selectedText}`,
+          text: selectedAiMarkdown,
           targetLanguage: settings.targetLanguage,
           model: settings.openaiModel,
         }),
@@ -695,7 +701,7 @@ export default function Home() {
                 title={isSettingsOpen ? "收起偏好" : "展开偏好"}
                 type="button"
               >
-                <Settings />
+                {isSettingsOpen ? <ChevronUp /> : <ChevronDown />}
               </button>
             </div>
 
@@ -956,7 +962,7 @@ export default function Home() {
                 </h2>
                 <p className="panel-note">总结 / 翻译 / 音频</p>
               </div>
-              <Save aria-hidden="true" />
+              <Wrench aria-hidden="true" />
             </div>
 
             <div className="panel-body">
@@ -980,12 +986,15 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="tool-window-body">
-                      <p className="result-text">
-                        {summaryResult ||
-                          (aiAction === "summary"
-                            ? "正在生成总结..."
-                            : "暂无总结")}
-                      </p>
+                      <div className="result-text markdown-content">
+                        {summaryResult ? (
+                          <MarkdownText value={summaryResult} />
+                        ) : aiAction === "summary" ? (
+                          "正在生成总结..."
+                        ) : (
+                          "暂无总结"
+                        )}
+                      </div>
                     </div>
                   </section>
 
@@ -1007,12 +1016,15 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="tool-window-body">
-                      <p className="result-text">
-                        {translationResult ||
-                          (aiAction === "translate"
-                            ? "正在翻译原文..."
-                            : "暂无译文")}
-                      </p>
+                      <div className="result-text markdown-content">
+                        {translationResult ? (
+                          <MarkdownText value={translationResult} />
+                        ) : aiAction === "translate" ? (
+                          "正在翻译原文..."
+                        ) : (
+                          "暂无译文"
+                        )}
+                      </div>
                     </div>
                   </section>
 

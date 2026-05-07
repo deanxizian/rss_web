@@ -248,6 +248,7 @@ a {
 .feed-panel {
   grid-area: feed;
   min-height: 0;
+  overflow: hidden;
 }
 
 .original-panel {
@@ -372,7 +373,7 @@ a {
 }
 
 .feed-meta {
-  padding: 0 16px 14px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -547,6 +548,10 @@ a {
   overflow-wrap: anywhere;
 }
 
+.result-text.markdown-content {
+  white-space: normal;
+}
+
 .window-grid {
   display: grid;
   gap: 12px;
@@ -696,15 +701,33 @@ a {
 
   .main-grid {
     grid-template-columns: var(--side-column-width) minmax(0, 1fr);
-    grid-template-areas:
-      "side original"
-      "feed workbench";
+    grid-template-areas: "navigation workspace";
     align-items: stretch;
   }
 
-  .navigation-stack,
+  .navigation-stack {
+    grid-area: navigation;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .workspace-stack {
-    display: contents;
+    grid-area: workspace;
+    display: grid;
+    grid-template-areas:
+      "original"
+      "workbench";
+    gap: 16px;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .feed-panel .article-list-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow: auto;
   }
 }
 
@@ -726,8 +749,11 @@ a {
     grid-template-areas:
       "side"
       "feed";
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 16px;
+    height: var(--viewport-panel-height);
     min-width: 0;
+    min-height: 0;
   }
 
   .workspace-stack {
@@ -798,6 +824,10 @@ a {
 }
 
 @media (max-width: 859px) {
+  .topbar {
+    position: static;
+  }
+
   .topbar-inner,
   .main-grid {
     padding-left: 14px;
@@ -806,10 +836,30 @@ a {
 
   .topbar-inner {
     grid-template-columns: 1fr;
+    gap: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .brand-subtitle {
+    display: none;
   }
 
   .rss-form {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .rss-form .input {
+    min-width: 0;
+  }
+
+  .rss-form .button {
+    width: auto;
+    padding: 0 12px;
+  }
+
+  .status-line {
+    min-height: auto;
   }
 
   .button {
