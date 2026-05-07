@@ -20,6 +20,26 @@ export const azureVoiceOptions = [
   { value: "zh-CN-YunxiNeural", label: "云希（中文男声）", language: "zh-CN" },
   { value: "zh-CN-YunjianNeural", label: "云健（中文男声）", language: "zh-CN" },
   { value: "zh-CN-YunyangNeural", label: "云扬（中文男声）", language: "zh-CN" },
+  {
+    value: "zh-CN-Xiaoxiao:DragonHDFlashLatestNeural",
+    label: "晓晓 Dragon HD Flash（中文女声）",
+    language: "zh-CN",
+  },
+  {
+    value: "zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural",
+    label: "晓晓 2 Dragon HD Flash（中文女声）",
+    language: "zh-CN",
+  },
+  {
+    value: "zh-CN-Yunxiao:DragonHDFlashLatestNeural",
+    label: "云霄 Dragon HD Flash（中文男声）",
+    language: "zh-CN",
+  },
+  {
+    value: "zh-CN-Yunyi:DragonHDFlashLatestNeural",
+    label: "云逸 Dragon HD Flash（中文男声）",
+    language: "zh-CN",
+  },
   { value: "en-US-JennyNeural", label: "Jenny（英文女声）", language: "en-US" },
   { value: "en-US-GuyNeural", label: "Guy（英文男声）", language: "en-US" },
 ] as const;
