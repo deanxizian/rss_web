@@ -5,7 +5,8 @@ export const runtime = "nodejs";
 export const maxDuration = 45;
 
 const azureOutputFormat = "audio-24khz-48kbitrate-mono-mp3";
-const maxSpeechTextLength = 3_000;
+const azureSpeechRequestTimeoutMs = 18_000;
+const maxSpeechTextLength = 900;
 
 function escapeSsml(text: string) {
   return text
@@ -55,6 +56,18 @@ async function requestAzureSpeech({
     ok: boolean;
     status: number;
   }>((resolve, reject) => {
+    let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    function finish(callback: () => void) {
+      if (settled) return;
+      settled = true;
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      callback();
+    }
+
     const request = https.request(
       url,
       {
@@ -76,20 +89,30 @@ async function requestAzureSpeech({
         response.on("end", () => {
           const status = response.statusCode ?? 0;
 
-          resolve({
-            body: Buffer.concat(chunks),
-            contentType: String(response.headers["content-type"] ?? ""),
-            ok: status >= 200 && status < 300,
-            status,
+          finish(() => {
+            resolve({
+              body: Buffer.concat(chunks),
+              contentType: String(response.headers["content-type"] ?? ""),
+              ok: status >= 200 && status < 300,
+              status,
+            });
           });
+        });
+        response.on("error", (error) => {
+          finish(() => reject(error));
         });
       },
     );
 
-    request.setTimeout(30_000, () => {
+    timeout = setTimeout(() => {
+      request.destroy(new Error("Azure Speech request timed out."));
+    }, azureSpeechRequestTimeoutMs);
+    request.setTimeout(azureSpeechRequestTimeoutMs, () => {
       request.destroy(new Error("Azure Speech request timed out."));
     });
-    request.on("error", reject);
+    request.on("error", (error) => {
+      finish(() => reject(error));
+    });
     request.write(body);
     request.end();
   });

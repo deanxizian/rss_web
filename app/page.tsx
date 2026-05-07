@@ -139,7 +139,7 @@ function firstUsefulText(item: FeedItem) {
   return [item.content, item.summary, item.title].find((value) => value.trim()) ?? "";
 }
 
-const speechChunkMaxLength = 2_500;
+const speechChunkMaxLength = 700;
 
 function splitTextForSpeech(text: string) {
   const normalized = text
