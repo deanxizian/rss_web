@@ -377,11 +377,15 @@ export default function Home() {
   const [translationResult, setTranslationResult] = useState("");
   const [audioSegments, setAudioSegments] = useState<string[]>([]);
   const [audioSegmentTotal, setAudioSegmentTotal] = useState(0);
+  const [pendingAudioSegmentIndex, setPendingAudioSegmentIndex] = useState<
+    number | null
+  >(null);
   const [isFetchingRss, setIsFetchingRss] = useState(false);
   const [aiAction, setAiAction] = useState<"summary" | "translate" | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const audioSegmentsRef = useRef<string[]>([]);
+  const audioPlayersRef = useRef<Array<HTMLAudioElement | null>>([]);
 
   useEffect(() => {
     setSettings(
@@ -406,6 +410,19 @@ export default function Home() {
       audioSegmentsRef.current.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
+
+  useEffect(() => {
+    if (pendingAudioSegmentIndex === null || !audioSegments[pendingAudioSegmentIndex]) {
+      return;
+    }
+
+    const nextAudio = audioPlayersRef.current[pendingAudioSegmentIndex];
+    if (!nextAudio) return;
+
+    nextAudio.currentTime = 0;
+    nextAudio.play().catch(() => undefined);
+    setPendingAudioSegmentIndex(null);
+  }, [audioSegments, pendingAudioSegmentIndex]);
 
   const selectedItem = useMemo(() => {
     if (!feed) return null;
@@ -441,8 +458,10 @@ export default function Home() {
   function replaceAudioSegments(nextSegments: string[]) {
     audioSegmentsRef.current.forEach((url) => URL.revokeObjectURL(url));
     audioSegmentsRef.current = nextSegments;
+    audioPlayersRef.current = [];
     setAudioSegments(nextSegments);
     setAudioSegmentTotal(nextSegments.length);
+    setPendingAudioSegmentIndex(null);
   }
 
   function appendAudioSegment(nextSegment: string) {
@@ -453,6 +472,32 @@ export default function Home() {
 
   function clearAudioSegments() {
     replaceAudioSegments([]);
+  }
+
+  function playAudioSegment(index: number) {
+    const audio = audioPlayersRef.current[index];
+    if (!audio) {
+      setPendingAudioSegmentIndex(index);
+      return;
+    }
+
+    audio.currentTime = 0;
+    audio.play().catch(() => undefined);
+  }
+
+  function handleAudioEnded(index: number) {
+    const nextIndex = index + 1;
+    const total = audioSegmentTotal || audioSegmentsRef.current.length;
+
+    if (nextIndex >= total) {
+      return;
+    }
+
+    if (audioSegmentsRef.current[nextIndex]) {
+      playAudioSegment(nextIndex);
+    } else {
+      setPendingAudioSegmentIndex(nextIndex);
+    }
   }
 
   function updateSources(nextSources: SavedSource[]) {
@@ -1071,7 +1116,15 @@ export default function Home() {
                                   {audioSegmentTotal || audioSegments.length} 段
                                 </div>
                               ) : null}
-                              <audio className="audio-player" controls src={url} />
+                              <audio
+                                className="audio-player"
+                                controls
+                                onEnded={() => handleAudioEnded(index)}
+                                ref={(element) => {
+                                  audioPlayersRef.current[index] = element;
+                                }}
+                                src={url}
+                              />
                             </div>
                           ))}
                         </div>
