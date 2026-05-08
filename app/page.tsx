@@ -101,6 +101,11 @@ function normalizeSettings(settings: Partial<SettingsState>): SettingsState {
   return {
     ...defaultSettings,
     ...settings,
+    openaiModel: openAIModelOptions.some(
+      (option) => option.value === settings.openaiModel,
+    )
+      ? (settings.openaiModel ?? defaultSettings.openaiModel)
+      : defaultSettings.openaiModel,
     speechLanguage,
     azureVoice: voiceMatchesLanguage
       ? (settings.azureVoice ?? getDefaultVoiceForLanguage(speechLanguage).value)

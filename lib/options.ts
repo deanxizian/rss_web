@@ -1,5 +1,4 @@
 export const openAIModelOptions = [
-  { value: "gpt-5.4-nano", label: "gpt-5.4-nano" },
   { value: "gpt-5.4-mini", label: "gpt-5.4-mini" },
   { value: "gpt-5.5", label: "gpt-5.5" },
   {
