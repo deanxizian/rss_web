@@ -1056,7 +1056,6 @@ export default function Home() {
               ref={opmlInputRef}
               className="hidden-file-input"
               type="file"
-              accept=".opml,application/xml,text/xml"
               onChange={handleOpmlInputChange}
             />
           </form>
