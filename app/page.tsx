@@ -31,7 +31,6 @@ import {
   azureVoiceOptions,
   openAIModelOptions,
   speechLanguageOptions,
-  speechRateOptions,
   translationLanguageOptions,
 } from "@/lib/options";
 
@@ -94,7 +93,7 @@ const defaultSettings: SettingsState = {
   targetLanguage: translationLanguageOptions[0].value,
   azureVoice: azureVoiceOptions[0].value,
   speechLanguage: azureVoiceOptions[0].language,
-  speechRate: speechRateOptions[1].value,
+  speechRate: 1,
 };
 
 function getDefaultVoiceForLanguage(language: string) {
@@ -102,17 +101,6 @@ function getDefaultVoiceForLanguage(language: string) {
     azureVoiceOptions.find((option) => option.language === language) ??
     azureVoiceOptions[0]
   );
-}
-
-function normalizeSpeechRateSetting(value: unknown) {
-  const rate = Number(value);
-  if (!Number.isFinite(rate)) return defaultSettings.speechRate;
-
-  return speechRateOptions.reduce((closest, option) => {
-    return Math.abs(option.value - rate) < Math.abs(closest - rate)
-      ? option.value
-      : closest;
-  }, defaultSettings.speechRate);
 }
 
 function normalizeSettings(settings: Partial<SettingsState>): SettingsState {
@@ -126,7 +114,7 @@ function normalizeSettings(settings: Partial<SettingsState>): SettingsState {
     (option) =>
       option.value === settings.azureVoice && option.language === speechLanguage,
   );
-  const speechRate = normalizeSpeechRateSetting(settings.speechRate);
+  const speechRate = Number(settings.speechRate);
 
   return {
     ...defaultSettings,
@@ -137,7 +125,9 @@ function normalizeSettings(settings: Partial<SettingsState>): SettingsState {
       ? (settings.openaiModel ?? defaultSettings.openaiModel)
       : defaultSettings.openaiModel,
     speechLanguage,
-    speechRate,
+    speechRate: Number.isFinite(speechRate)
+      ? Math.min(1.5, Math.max(0.7, speechRate))
+      : defaultSettings.speechRate,
     azureVoice: voiceMatchesLanguage
       ? (settings.azureVoice ?? getDefaultVoiceForLanguage(speechLanguage).value)
       : getDefaultVoiceForLanguage(speechLanguage).value,
@@ -1012,7 +1002,7 @@ export default function Home() {
         <div className="topbar-inner">
             <div className="brand">
               <h1 className="brand-title">RSS AI Reader</h1>
-            <p className="brand-subtitle">订阅、正文、总结、翻译、朗读</p>
+            <p className="brand-subtitle">RSS 阅读与 AI 内容处理</p>
           </div>
 
           <form
@@ -1216,22 +1206,25 @@ export default function Home() {
 
                 <label className="setting-row">
                   <span className="label">朗读速度</span>
-                  <select
-                    className="select"
-                    value={settings.speechRate}
-                    onChange={(event) =>
-                      setSettings((current) => ({
-                        ...current,
-                        speechRate: Number(event.target.value),
-                      }))
-                    }
-                  >
-                    {speechRateOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="range-row">
+                    <input
+                      className="range-input"
+                      type="range"
+                      min="0.7"
+                      max="1.5"
+                      step="0.05"
+                      value={settings.speechRate}
+                      onChange={(event) =>
+                        setSettings((current) => ({
+                          ...current,
+                          speechRate: Number(event.target.value),
+                        }))
+                      }
+                    />
+                    <span className="range-value">
+                      {settings.speechRate.toFixed(2)}x
+                    </span>
+                  </div>
                 </label>
 
                 <p className="hint">
@@ -1343,7 +1336,7 @@ export default function Home() {
               <FileText aria-hidden="true" />
             </div>
 
-            <div className="panel-body">
+            <div className={`panel-body ${selectedItem ? "" : "empty-panel-body"}`}>
               {selectedItem ? (
                 <article className="article-detail">
                   <div>
@@ -1385,7 +1378,7 @@ export default function Home() {
               <Wrench aria-hidden="true" />
             </div>
 
-            <div className="panel-body">
+            <div className={`panel-body ${selectedItem ? "" : "empty-panel-body"}`}>
               {selectedItem ? (
                 <div className="window-grid">
                   <section className="tool-window" aria-label="总结模块">
