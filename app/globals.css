@@ -708,9 +708,31 @@ a {
 
   .navigation-stack {
     grid-area: navigation;
-    grid-template-rows: auto minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    grid-template-rows: auto auto;
+    gap: 16px;
+    align-self: stretch;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
+  }
+
+  .side-stack {
+    grid-template-rows: auto minmax(0, 1fr);
+    height: var(--viewport-panel-height);
+    align-content: stretch;
+    overflow: visible;
+  }
+
+  .navigation-stack.settings-open .side-stack {
+    grid-template-rows: auto auto;
+    height: auto;
+    align-content: start;
+  }
+
+  .settings-panel.expanded,
+  .original-panel {
+    min-height: var(--viewport-panel-height);
   }
 
   .workspace-stack {
@@ -719,9 +741,15 @@ a {
     grid-template-areas:
       "original"
       "workbench";
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 16px;
+    align-self: stretch;
     min-width: 0;
     min-height: 0;
+  }
+
+  .workbench-panel .panel-body {
+    flex: 1;
   }
 
   .feed-panel .article-list-wrap {
@@ -729,6 +757,10 @@ a {
     min-height: 0;
     max-height: none;
     overflow: auto;
+  }
+
+  .navigation-stack > .feed-panel {
+    flex: 1 1 auto;
   }
 }
 
@@ -750,11 +782,15 @@ a {
     grid-template-areas:
       "side"
       "feed";
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
     gap: 16px;
-    height: var(--viewport-panel-height);
     min-width: 0;
     min-height: 0;
+    overflow: visible;
+  }
+
+  .navigation-stack > .feed-panel {
+    min-height: 420px;
   }
 
   .workspace-stack {
@@ -800,7 +836,6 @@ a {
 @media (min-width: 1480px) {
   .main-grid {
     grid-template-columns: var(--side-column-width) repeat(3, minmax(0, 1fr));
-    grid-template-rows: var(--viewport-panel-height);
     grid-template-areas: "side feed original workbench";
   }
 
@@ -809,9 +844,16 @@ a {
   }
 
   .side-stack {
-    height: var(--viewport-panel-height);
-    align-content: start;
-    overflow: auto;
+    overflow: visible;
+  }
+
+  .side-stack > .panel:not(.settings-panel) {
+    min-height: 280px;
+  }
+
+  .side-stack .source-list {
+    max-height: none;
+    overflow: visible;
   }
 
   .feed-panel {

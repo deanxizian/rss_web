@@ -739,9 +739,16 @@ export default function Home() {
       </header>
 
       <div className="main-grid">
-        <div className="navigation-stack">
+        <div
+          className={`navigation-stack ${
+            isSettingsOpen ? "settings-open" : "settings-closed"
+          }`}
+        >
           <aside className="side-stack">
-            <section className="panel settings-panel" aria-labelledby="settings-title">
+            <section
+              className={`panel settings-panel ${isSettingsOpen ? "expanded" : ""}`}
+              aria-labelledby="settings-title"
+            >
             <div className="panel-header">
               <div>
                 <h2 className="panel-title" id="settings-title">
