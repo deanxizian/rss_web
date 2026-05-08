@@ -17,6 +17,19 @@ function escapeSsml(text: string) {
     .replace(/'/g, "&apos;");
 }
 
+function normalizeSpeechRate(value: unknown) {
+  const rate = Number(value);
+
+  if (!Number.isFinite(rate)) {
+    return "+0%";
+  }
+
+  const clamped = Math.min(1.5, Math.max(0.7, rate));
+  const percent = Math.round((clamped - 1) * 100);
+
+  return `${percent >= 0 ? "+" : ""}${percent}%`;
+}
+
 function getSpeechEndpoint(baseUrl: string | undefined, region: string | undefined) {
   if (baseUrl) {
     const normalized = baseUrl.replace(/\/$/, "");
@@ -134,6 +147,7 @@ export async function POST(request: Request) {
     text?: string;
     voice?: string;
     language?: string;
+    speechRate?: number;
   };
 
   const key = process.env.AZURE_SPEECH_KEY;
@@ -142,6 +156,7 @@ export async function POST(request: Request) {
   const voice = String(payload.voice ?? "").trim();
   const language = String(payload.language ?? "zh-CN").trim();
   const text = String(payload.text ?? "").trim();
+  const speechRate = normalizeSpeechRate(payload.speechRate);
 
   if (!key || (!region && !baseUrl)) {
     return Response.json(
@@ -165,7 +180,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "缺少 Azure Speech 音色。" }, { status: 400 });
   }
 
-  const ssml = `<speak version="1.0" xml:lang="${language}"><voice xml:lang="${language}" name="${voice}">${escapeSsml(text)}</voice></speak>`;
+  const ssml = `<speak version="1.0" xml:lang="${language}"><voice xml:lang="${language}" name="${voice}"><prosody rate="${speechRate}">${escapeSsml(text)}</prosody></voice></speak>`;
 
   const endpoint = getSpeechEndpoint(baseUrl, region);
 

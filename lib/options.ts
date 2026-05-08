@@ -47,3 +47,11 @@ export const speechLanguageOptions = [
   { value: "zh-CN", label: "中文" },
   { value: "en-US", label: "英文" },
 ] as const;
+
+export const speechRateOptions = [
+  { value: 0.85, label: "稍慢 0.85x" },
+  { value: 1, label: "正常 1.00x" },
+  { value: 1.15, label: "稍快 1.15x" },
+  { value: 1.3, label: "快速 1.30x" },
+  { value: 1.5, label: "很快 1.50x" },
+] as const;
